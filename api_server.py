@@ -8,6 +8,13 @@ from example import verify_user, create_user, create_session, verify_session, ge
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
+# Ensure database schema is updated
+try:
+    from db_update import apply_schema_updates
+    apply_schema_updates()
+except Exception as e:
+    print(f"Warning: Could not apply schema updates: {e}")
+
 @app.route("/api/login", methods=["POST"])
 def login():
     data = request.get_json()
@@ -139,6 +146,192 @@ def create_new_user(admin_id):
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# ======= NEW API ENDPOINTS FOR TASKS AND REQUESTS =======
+
+# Get all tasks for a user
+@app.route("/api/tasks", methods=["GET"])
+@auth_required
+def get_tasks(user_id):
+    conn = sqlite3.connect("auth.db")
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    # Get tasks where the user is an owner
+    cursor.execute("""
+        SELECT t.id, t.description, t.created_at
+        FROM tasks t
+        JOIN task_owners to_rel ON t.id = to_rel.task_id
+        WHERE to_rel.user_id = ?
+        ORDER BY t.created_at DESC
+    """, (user_id,))
+    
+    tasks = []
+    for row in cursor.fetchall():
+        # Get all owners for each task
+        cursor.execute("""
+            SELECT u.id, u.username, u.first_name, u.last_name
+            FROM users u
+            JOIN task_owners to_rel ON u.id = to_rel.user_id
+            WHERE to_rel.task_id = ?
+        """, (row["id"],))
+        
+        owners = []
+        for owner in cursor.fetchall():
+            owners.append({
+                "id": owner["id"],
+                "username": owner["username"],
+                "name": f"{owner['first_name']} {owner['last_name']}"
+            })
+        
+        tasks.append({
+            "id": row["id"],
+            "description": row["description"],
+            "created_at": row["created_at"],
+            "owners": owners
+        })
+    
+    conn.close()
+    return jsonify({"tasks": tasks})
+
+# Create a new task
+@app.route("/api/tasks", methods=["POST"])
+@auth_required
+def create_task(user_id):
+    data = request.get_json()
+    
+    if not data or "description" not in data:
+        return jsonify({"error": "Missing description"}), 400
+    
+    # Default to current user as owner if not specified
+    owner_ids = data.get("owner_ids", [user_id])
+    
+    # Ensure current user is included in owners
+    if user_id not in owner_ids:
+        owner_ids.append(user_id)
+    
+    conn = sqlite3.connect("auth.db")
+    cursor = conn.cursor()
+    
+    try:
+        # Create the task
+        cursor.execute(
+            "INSERT INTO tasks (description) VALUES (?)",
+            (data["description"],)
+        )
+        task_id = cursor.lastrowid
+        
+        # Add owners
+        for owner_id in owner_ids:
+            cursor.execute(
+                "INSERT INTO task_owners (task_id, user_id) VALUES (?, ?)",
+                (task_id, owner_id)
+            )
+        
+        conn.commit()
+        
+        return jsonify({
+            "message": "Task created successfully",
+            "task_id": task_id
+        }), 201
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+# Get all requests for a user
+@app.route("/api/requests", methods=["GET"])
+@auth_required
+def get_requests(user_id):
+    conn = sqlite3.connect("auth.db")
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    # Get requests made by this user
+    cursor.execute("""
+        SELECT r.id, r.description, r.created_at, 
+               u.id as solicitor_id, u.username as solicitor_username,
+               u.first_name as solicitor_first_name, u.last_name as solicitor_last_name
+        FROM requests r
+        JOIN users u ON r.solicitor_id = u.id
+        WHERE r.solicitor_id = ?
+        ORDER BY r.created_at DESC
+    """, (user_id,))
+    
+    requests = []
+    for row in cursor.fetchall():
+        requests.append({
+            "id": row["id"],
+            "description": row["description"],
+            "created_at": row["created_at"],
+            "solicitor": {
+                "id": row["solicitor_id"],
+                "username": row["solicitor_username"],
+                "name": f"{row['solicitor_first_name']} {row['solicitor_last_name']}"
+            }
+        })
+    
+    conn.close()
+    return jsonify({"requests": requests})
+
+# Create a new request
+@app.route("/api/requests", methods=["POST"])
+@auth_required
+def create_request(user_id):
+    data = request.get_json()
+    
+    if not data or "description" not in data:
+        return jsonify({"error": "Missing description"}), 400
+    
+    conn = sqlite3.connect("auth.db")
+    cursor = conn.cursor()
+    
+    try:
+        # Create the request with the current user as solicitor
+        cursor.execute(
+            "INSERT INTO requests (solicitor_id, description) VALUES (?, ?)",
+            (user_id, data["description"])
+        )
+        request_id = cursor.lastrowid
+        conn.commit()
+        
+        return jsonify({
+            "message": "Request created successfully",
+            "request_id": request_id
+        }), 201
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+# Get all users (for selecting task owners)
+@app.route("/api/users", methods=["GET"])
+@auth_required
+def get_all_users(user_id):
+    conn = sqlite3.connect("auth.db")
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT id, username, first_name, last_name
+        FROM users
+        ORDER BY username
+    """)
+    
+    users = []
+    for row in cursor.fetchall():
+        users.append({
+            "id": row["id"],
+            "username": row["username"],
+            "name": f"{row['first_name']} {row['last_name']}"
+        })
+    
+    conn.close()
+    return jsonify({"users": users})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
