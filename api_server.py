@@ -1,10 +1,12 @@
 from flask import Flask, request, jsonify, g
+from flask_cors import CORS  # Add CORS support
 import sqlite3
 from functools import wraps
 import os
 from example import verify_user, create_session, verify_session, get_user_roles
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 
 @app.route("/api/login", methods=["POST"])
 def login():
