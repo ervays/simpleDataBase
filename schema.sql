@@ -39,6 +39,36 @@ CREATE TABLE sessions (
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
+-- Tasks table with unique ID and description
+CREATE TABLE tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    description TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Task owners (many-to-many relationship)
+CREATE TABLE task_owners (
+    task_id INTEGER,
+    user_id INTEGER,
+    PRIMARY KEY (task_id, user_id),
+    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Requests table with unique ID, solicitor and description
+CREATE TABLE requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    solicitor_id INTEGER NOT NULL,
+    description TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (solicitor_id) REFERENCES users(id)
+);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_task_owners_task_id ON task_owners(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_owners_user_id ON task_owners(user_id);
+CREATE INDEX IF NOT EXISTS idx_requests_solicitor ON requests(solicitor_id);
+
 -- Insert default roles
 INSERT INTO roles (name, description) VALUES ('admin', 'Administrator with full access');
 INSERT INTO roles (name, description) VALUES ('user', 'Regular user with limited access');
