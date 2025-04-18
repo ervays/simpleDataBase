@@ -147,7 +147,7 @@ def create_new_user(admin_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# ======= NEW API ENDPOINTS FOR TASKS AND REQUESTS =======
+# ======= API ENDPOINTS FOR TASKS AND REQUESTS =======
 
 # Get all tasks for a user
 @app.route("/api/tasks", methods=["GET"])
@@ -308,7 +308,7 @@ def create_request(user_id):
     finally:
         conn.close()
 
-# Get all users (for selecting task owners) - MODIFIED TO EXCLUDE ADMINS
+# Get all regular users (excluding admin users) for selecting task owners
 @app.route("/api/users", methods=["GET"])
 @auth_required
 def get_all_users(user_id):
@@ -316,16 +316,13 @@ def get_all_users(user_id):
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    # Get only non-admin users
+    # Get users who are not admins
     cursor.execute("""
         SELECT DISTINCT u.id, u.username, u.first_name, u.last_name
         FROM users u
-        WHERE u.id NOT IN (
-            SELECT ur.user_id
-            FROM user_roles ur
-            JOIN roles r ON ur.role_id = r.id
-            WHERE r.name = 'admin'
-        )
+        LEFT JOIN user_roles ur ON u.id = ur.user_id
+        LEFT JOIN roles r ON ur.role_id = r.id AND r.name = 'admin'
+        WHERE r.id IS NULL
         ORDER BY u.username
     """)
     
