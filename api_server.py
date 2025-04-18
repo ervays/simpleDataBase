@@ -308,7 +308,7 @@ def create_request(user_id):
     finally:
         conn.close()
 
-# Get all users (for selecting task owners)
+# Get all users (for selecting task owners) - MODIFIED TO EXCLUDE ADMINS
 @app.route("/api/users", methods=["GET"])
 @auth_required
 def get_all_users(user_id):
@@ -316,10 +316,17 @@ def get_all_users(user_id):
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
+    # Get only non-admin users
     cursor.execute("""
-        SELECT id, username, first_name, last_name
-        FROM users
-        ORDER BY username
+        SELECT DISTINCT u.id, u.username, u.first_name, u.last_name
+        FROM users u
+        WHERE u.id NOT IN (
+            SELECT ur.user_id
+            FROM user_roles ur
+            JOIN roles r ON ur.role_id = r.id
+            WHERE r.name = 'admin'
+        )
+        ORDER BY u.username
     """)
     
     users = []
