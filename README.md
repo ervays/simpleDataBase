@@ -1,55 +1,48 @@
-# Simple Authentication Database
+# Simple Hello World API
 
-This repository contains a simple SQLite database schema for user authentication. It provides basic functionality for user management, role-based access control, and session tracking.
+A basic Hello World API server that runs on port 8080.
 
-## Schema Structure
+## Features
 
-### Tables
+- Express.js REST API
+- Returns a simple JSON response
+- Containerized with Docker
 
-1. **users** - Stores user credentials and personal information
-   - `id`: Unique identifier (auto-incremented)
-   - `username`: Unique username
-   - `password_hash`: Password hash (NOT plaintext password!)
-   - `email`: User's email address
-   - `first_name`, `last_name`: User's name
-   - `is_active`: User account status
-   - `created_at`: Account creation timestamp
-   - `last_login`: Last login timestamp
+## Getting Started
 
-2. **roles** - Defines available roles in the system
-   - `id`: Role identifier
-   - `name`: Unique role name
-   - `description`: Role description
+### Prerequisites
 
-3. **user_roles** - Maps users to roles (many-to-many relationship)
-   - `user_id`: Reference to user
-   - `role_id`: Reference to role
+- Node.js (for local development)
+- Docker (for containerized deployment)
 
-4. **sessions** - Tracks user authentication sessions
-   - `id`: Session identifier
-   - `user_id`: Reference to user
-   - `session_token`: Unique session token
-   - `expires_at`: Session expiration timestamp
-   - `created_at`: Session creation timestamp
+### Local Development
 
-## Usage
+1. Install dependencies:
+   ```
+   npm install
+   ```
 
-### Creating the Database
+2. Start the server:
+   ```
+   npm start
+   ```
 
-Use the following commands to create the database:
+3. Access the API at http://localhost:8080
 
-```bash
-# Create a new SQLite database
-sqlite3 auth.db < schema.sql
-```
+### Docker Deployment
 
-### Python Example
+1. Build the Docker image:
+   ```
+   docker build -t hello-world-api .
+   ```
 
-Check the `example.py` file for a demonstration of how to interact with the database using Python.
+2. Run the container:
+   ```
+   docker run -p 8080:8080 hello-world-api
+   ```
 
-## Security Notes
+3. Access the API at http://localhost:8080
 
-- Always store password hashes, never plaintext passwords
-- Use a strong hashing algorithm like bcrypt or Argon2
-- Implement proper session management
-- Consider adding additional security features like rate limiting, multi-factor authentication, etc.
+## API Endpoints
+
+- `GET /`: Returns a JSON response with "Hello World!" message
